@@ -20,12 +20,13 @@ import com.vaadin.ui.declarative.Design;
 
 import java.io.*;
 import java.lang.reflect.Modifier;
+import java.util.Iterator;
+import java.util.Set;
 
 /**
  * @author https://github.com/elmot
  */
 /*
- * TODO link fields to superclass
  * TODO Grid special handling
  */
 public class DesignToJavaConverter {
@@ -88,9 +89,74 @@ public class DesignToJavaConverter {
             declarativeClass._extends(jCodeModel.directClass(baseClassName));
         }
         JMethod init = declarativeClass.method(Modifier.PUBLIC + Modifier.STATIC, void.class, "init");
-        Design.setComponentFactory(new SpyComponentFactory(jCodeModel, declarativeClass, init.body()));
-        Design.read(input);
-        jCodeModel.build(new MyCodeWriter(output));
+        SpyComponentFactory componentFactory = new SpyComponentFactory(jCodeModel, declarativeClass, init.body());
+        Design.setComponentFactory(componentFactory);
+        Design.read(preProcessInputFile(input));
+        JCodeModel refactoredCodeModel = refactor(jCodeModel, componentFactory.getMemberFieldJVars());
+        refactoredCodeModel.build(new MyCodeWriter(output));
+    }
+
+    /**
+     * Converts _id="x" to data="x" to facilitate recognizing member field
+     */
+    private static InputStream preProcessInputFile(InputStream inputStream) throws IOException {
+        BufferedReader reader = new BufferedReader(new InputStreamReader(inputStream));
+        StringBuilder editedContent = new StringBuilder();
+        String line;
+        while ((line = reader.readLine()) != null) {
+            String editedLine = line.replace(" _id=\"", " data=\"");
+            editedContent.append(editedLine).append("\n");
+        }
+        return new ByteArrayInputStream(editedContent.toString().getBytes());
+    }
+
+    /**
+     * Rebuild the code model but making named local variables as member fields
+     */
+    private static JCodeModel refactor(JCodeModel original, Set<JVar> memberFieldJVars) throws JClassAlreadyExistsException {
+        JCodeModel copy = new JCodeModel();
+        for (Iterator<JPackage> it = original.packages(); it.hasNext(); ) {
+            JPackage pkg = it.next();
+            JPackage newPkg = copy._package(pkg.name());
+            for (Iterator<JDefinedClass> iter = pkg.classes(); iter.hasNext(); ) {
+                JDefinedClass originalClass = iter.next();
+                JDefinedClass newClass = newPkg._class(originalClass.name());
+                newClass._extends(originalClass.superClass());
+                // Copy fields
+                for (JFieldVar field : originalClass.fields().values()) {
+                    newClass.field(field.mods().getValue(), field.type(), field.name());
+                }
+                // Copy methods
+                for (JMethod method : originalClass.methods()) {
+                    JMethod newMethod = newClass.method(method.mods().getValue(), method.type(), method.name());
+                    // Copy method parameters
+                    for (JVar param : method.params()) {
+                        newMethod.param(param.type(), param.name());
+                    }
+                    for (Object obj : method.body().getContents()) {
+                        if (isNamedField(obj, memberFieldJVars)) {
+                            JVar localVar = (JVar) obj;
+                            newClass.field(JMod.PROTECTED, localVar.type(), localVar.name());
+                            newMethod.body().assign(JExpr._this().ref(localVar.name()), JExpr._new(localVar.type()));
+                        } else {
+                            if (obj instanceof JVar) {
+                                JVar originalJVar = (JVar) obj;
+                                newMethod.body().decl(originalJVar.type(), originalJVar.name(), JExpr._new(originalJVar.type()));
+                            }
+                            if (obj instanceof JInvocation) {
+                                JInvocation originalJInv = (JInvocation) obj;
+                                newMethod.body().add(originalJInv);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        return copy;
+    }
+
+    private static boolean isNamedField(Object obj, Set<JVar> memberFieldJVars) {
+        return memberFieldJVars.contains(obj);
     }
 
     private static class MyCodeWriter extends CodeWriter {

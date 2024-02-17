@@ -35,17 +35,12 @@ import java.util.Collections;
  */
 public class TestConvert {
 
-    public static final String PACKAGE_NAME = "org.vaadin.example";
-    public static final String CLASS_NAME = "Example";
+    public static final String PACKAGE_NAME = "org.vaadin.declarative";
+    public static final String CLASS_NAME = "StorefrontViewDesign";
 
     @Test
-    public void testSimple() throws Exception {
-        unTest("testFile.html",null);
-    }
-
-    @Test
-    public void testGrid() throws Exception {
-        unTest("TestTest.html","org.vaadin.declarative.TestTest");
+    public void testStorefrontView() throws Exception {
+        unTest("StorefrontView.html","com.vaadin.ui.VerticalLayout");
     }
 
     public void unTest(String name, String baseClass) throws Exception {

@@ -48,6 +48,12 @@ public class SpyComponentFactory implements Design.ComponentFactory {
 
     private final Map<Alignment, String> alignments = new HashMap<>();
 
+    private final Set<JVar> memberFieldJVars = new HashSet<>();
+
+    public Set<JVar> getMemberFieldJVars() {
+        return memberFieldJVars;
+    }
+
     private void addHandler(BiConsumer<Consumer<JExpression>, Object> handler, Class<?>... classes) {
         for (Class<?> clazz : classes) {
             clazzPramHandlers.put(clazz.getName(), handler);
@@ -58,8 +64,11 @@ public class SpyComponentFactory implements Design.ComponentFactory {
         addHandler((Consumer<JExpression> expr, Object obj) -> expr.accept(JExpr.lit(((Number) obj).longValue())),
                 byte.class, Byte.class, short.class, Short.class, int.class, Integer.class, long.class, Long.class);
 
+        addHandler((Consumer<JExpression> expr, Object obj) -> expr.accept(JExpr.lit(((Number) obj).floatValue())),
+                float.class, Float.class);
+
         addHandler((Consumer<JExpression> expr, Object obj) -> expr.accept(JExpr.lit(((Number) obj).doubleValue())),
-                float.class, Float.class, double.class, Double.class);
+                double.class, Double.class);
 
         addHandler((Consumer<JExpression> expr, Object obj) -> expr.accept(JExpr.lit(((Character) obj).charValue())),
                 char.class, Character.class);
@@ -177,8 +186,19 @@ public class SpyComponentFactory implements Design.ComponentFactory {
                         JExpression jVar = variables.get(obj);
                         JInvocation invoke = jVar.invoke(name);
                         try {
-                            makeParams(method.getParameters(), args, invoke::arg);
-                            body.add(invoke);
+                            // _id attribute were converted to data attributes earlier
+                            // this way we can intercept member fields' names more easily
+                            if (name.equals("setData")) {
+                                // rename the variable with the given field name
+                                ((JVar) jVar).name((String) args[0]);
+                                // skip the method invocation creation,
+                                // just store the JVar declaration
+                                memberFieldJVars.add((JVar) jVar);
+                            } else {
+                                // process normally all the other set and add calls
+                                makeParams(method.getParameters(), args, invoke::arg);
+                                body.add(invoke);
+                            }
                         } catch (SkipCodePartException ignored) {
                         }
                         skipLogging = true;
