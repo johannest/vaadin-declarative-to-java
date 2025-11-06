@@ -182,8 +182,9 @@ public class SpyComponentFactory implements Design.ComponentFactory {
             if (!skipLogging) {
                 String name = method.getName();
                 if (name.startsWith("set") || name.startsWith("add")) {
+                    JExpression jVar = variables.get(obj);
+                    String identifier = getIdentifierForVar(jVar);
                     if (Modifier.isPublic(method.getModifiers())) {
-                        JExpression jVar = variables.get(obj);
                         JInvocation invoke = jVar.invoke(name);
                         try {
                             // _id attribute were converted to data attributes earlier
@@ -196,7 +197,7 @@ public class SpyComponentFactory implements Design.ComponentFactory {
                                 memberFieldJVars.add((JVar) jVar);
                             } else {
                                 // process normally all the other set and add calls
-                                makeParams(method.getParameters(), args, invoke::arg);
+                                makeParams(method.getParameters(), args, invoke::arg, identifier);
                                 body.add(invoke);
                             }
                         } catch (SkipCodePartException ignored) {
@@ -204,7 +205,7 @@ public class SpyComponentFactory implements Design.ComponentFactory {
                         skipLogging = true;
 
                     } else {
-                        System.err.println("Warning! non-public method call detected");
+                        System.err.println("Warning! non-public method call detected. " + identifier);
                         printExceptionCodePoint();
                     }
                 }
@@ -217,7 +218,16 @@ public class SpyComponentFactory implements Design.ComponentFactory {
         }
     }
 
-    private void makeParams(Parameter[] parameters, Object[] args, Consumer<JExpression> expr)
+    private String getIdentifierForVar(JExpression jVar) {
+        if(jVar instanceof JVar) {
+            JVar jVarC = (JVar) jVar;
+            return jVarC.type() != null ? jVarC.type().name() + "#" + jVarC.name() : "#" + jVarC.name();
+        } else {
+            return "unknown";
+        }
+    }
+
+    private void makeParams(Parameter[] parameters, Object[] args, Consumer<JExpression> expr, String identifier)
             throws SkipCodePartException {
         for (int i = 0; i < args.length; i++) {
             Object arg = args[i];
@@ -231,18 +241,18 @@ public class SpyComponentFactory implements Design.ComponentFactory {
                 expr.accept(((JClass) jCodeModel._ref(argType)).staticRef(((Enum) arg).name()));
             } else if (argType.isArray()) {
                 if (parameters != null && parameters[i].isVarArgs()) {
-                    makeParams(null, (Object[]) arg, expr);
+                    makeParams(null, (Object[]) arg, expr, identifier);
                 } else {
                     JArray jArray = JExpr.newArray(jCodeModel.ref(argType.getComponentType()));
                     expr.accept(jArray);
-                    makeParams(null, (Object[]) arg, jArray::add);
+                    makeParams(null, (Object[]) arg, jArray::add, identifier);
                 }
             } else {
                 BiConsumer<Consumer<JExpression>, Object> paramWorker = clazzPramHandlers.get(argType.getName());
                 if (paramWorker != null) {
                     paramWorker.accept(expr, arg);
                 } else {
-                    System.err.println("Warning! Unsupported class " + argType);
+                    System.err.println("Warning! Unsupported class " + argType + " in " + identifier);
                     printExceptionCodePoint();
                     throw new SkipCodePartException();
                 }
