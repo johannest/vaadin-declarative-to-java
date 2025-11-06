@@ -183,7 +183,7 @@ public class SpyComponentFactory implements Design.ComponentFactory {
                 String name = method.getName();
                 if (name.startsWith("set") || name.startsWith("add")) {
                     JExpression jVar = variables.get(obj);
-                    String identifier = getIdentifierForVar(jVar);
+                    String identifier = getIdentifierForVar(jVar) + " method: " + name;
                     if (Modifier.isPublic(method.getModifiers())) {
                         JInvocation invoke = jVar.invoke(name);
                         try {
@@ -205,7 +205,7 @@ public class SpyComponentFactory implements Design.ComponentFactory {
                         skipLogging = true;
 
                     } else {
-                        System.err.println("Warning! non-public method call detected. " + identifier);
+                        System.err.println("Warning! non-public method call detected. " + identifier + " method: " + name);
                         printExceptionCodePoint();
                     }
                 }
@@ -252,7 +252,7 @@ public class SpyComponentFactory implements Design.ComponentFactory {
                 if (paramWorker != null) {
                     paramWorker.accept(expr, arg);
                 } else {
-                    System.err.println("Warning! Unsupported class " + argType + " in " + identifier);
+                    System.err.println("Warning! Unsupported class " + argType + ". " + identifier);
                     printExceptionCodePoint();
                     throw new SkipCodePartException();
                 }
