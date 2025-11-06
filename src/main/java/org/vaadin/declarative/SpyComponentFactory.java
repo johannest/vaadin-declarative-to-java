@@ -205,7 +205,7 @@ public class SpyComponentFactory implements Design.ComponentFactory {
                         skipLogging = true;
 
                     } else {
-                        System.err.println("Warning! non-public method call detected. " + identifier + " method: " + name);
+                        System.err.println("Warning! non-public method call detected. " + identifier);
                         printExceptionCodePoint();
                     }
                 }
