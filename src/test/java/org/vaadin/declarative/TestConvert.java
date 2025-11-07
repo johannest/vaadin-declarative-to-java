@@ -56,7 +56,7 @@ public class TestConvert {
 
         StringWriter compilerLog = new StringWriter();
 
-        JavaFileObject fileObject = new ReadOnlyJavaFileObject(baos);
+        JavaFileObject fileObject = new ReadOnlyJavaFileObject("org.vaadin.declarative.StorefrontViewDesign", baos);
 
         ForwardingJavaFileManager<StandardJavaFileManager> fileManager = new NoSourceJavaFileManager(standardFileManager);
 

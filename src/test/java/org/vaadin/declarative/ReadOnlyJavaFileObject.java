@@ -1,12 +1,12 @@
 /*
  * Copyright 2000-2014 Vaadin Ltd.
- * 
+ *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not
  * use this file except in compliance with the License. You may obtain a copy of
  * the License at
- * 
+ *
  * http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
  * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
@@ -18,29 +18,28 @@ package org.vaadin.declarative;
 import javax.lang.model.element.Modifier;
 import javax.lang.model.element.NestingKind;
 import javax.tools.JavaFileObject;
-import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.InputStreamReader;
-import java.io.OutputStream;
-import java.io.Reader;
-import java.io.Writer;
+import java.io.*;
 import java.net.URI;
-import java.net.URISyntaxException;
 import java.nio.charset.StandardCharsets;
 
-/**
- * Source file object
- *
- * @author https://github.com/elmot
- */
 class ReadOnlyJavaFileObject implements JavaFileObject {
+    private final String classNameFqn;
     private final ByteArrayOutputStream baos;
 
-    ReadOnlyJavaFileObject(ByteArrayOutputStream baos) {
+    ReadOnlyJavaFileObject(String classNameFqn, ByteArrayOutputStream baos) {
+        this.classNameFqn = classNameFqn;
         this.baos = baos;
     }
+
+    private String simpleName() {
+        int dot = classNameFqn.lastIndexOf('.');
+        return dot >= 0 ? classNameFqn.substring(dot + 1) : classNameFqn;
+    }
+
+    private String path() {
+        return classNameFqn.replace('.', '/') + Kind.SOURCE.extension; // org/vaadin/.../StorefrontViewDesign.java
+    }
+
 
     @Override
     public Kind getKind() {
@@ -49,7 +48,7 @@ class ReadOnlyJavaFileObject implements JavaFileObject {
 
     @Override
     public boolean isNameCompatible(String simpleName, Kind kind) {
-        return "Example".equals(simpleName) && kind == Kind.SOURCE;
+        return kind == Kind.SOURCE && simpleName().equals(simpleName);
     }
 
     @Override
@@ -64,20 +63,16 @@ class ReadOnlyJavaFileObject implements JavaFileObject {
 
     @Override
     public URI toUri() {
-        try {
-            return new URI("virtual://" + getName());
-        } catch (URISyntaxException e) {
-            throw new RuntimeException(e);
-        }
+        return URI.create("string:///" + path());
     }
 
     @Override
     public String getName() {
-        return TestConvert.PACKAGE_NAME.replace('.', '/') + "/" + TestConvert.CLASS_NAME + ".java";
+        return path();
     }
 
     @Override
-    public InputStream openInputStream() throws IOException {
+    public InputStream openInputStream() {
         return new ByteArrayInputStream(baos.toByteArray());
     }
 
@@ -87,12 +82,12 @@ class ReadOnlyJavaFileObject implements JavaFileObject {
     }
 
     @Override
-    public Reader openReader(boolean ignoreEncodingErrors) throws IOException {
+    public Reader openReader(boolean ignoreEncodingErrors) {
         return new InputStreamReader(new ByteArrayInputStream(baos.toByteArray()), StandardCharsets.UTF_8);
     }
 
     @Override
-    public CharSequence getCharContent(boolean ignoreEncodingErrors) throws IOException {
+    public CharSequence getCharContent(boolean ignoreEncodingErrors) {
         return new String(baos.toByteArray(), StandardCharsets.UTF_8);
     }
 
